@@ -25,7 +25,7 @@
       background-color: #f1f5f9;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       min-height: 100vh;
       margin: 0;
       padding: 16px;
@@ -253,6 +253,8 @@
       const file = event.target.files[0];
       if (file && file.type.startsWith('image/')) {
         processImage(file);
+        // Reset file input to allow re-selecting the same file
+        event.target.value = '';
       } else {
         alert('Please select an image file.');
       }
