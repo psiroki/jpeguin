@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Converter</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 100%;
+      width: 100%;
+      max-width: 400px;
+      background-color: #ffffff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .slider-container {
+      margin-bottom: 24px;
+    }
+    label {
+      display: block;
+      font-size: 1.125rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 12px;
+      background: #e5e7eb;
+      border-radius: 9999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      background: #2563eb;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #1e40af;
+    }
+    button, .file-button {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      font-size: 1.125rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-align: center;
+    }
+    .file-button {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    .file-button:hover {
+      background: #1e40af;
+    }
+    #pasteButton {
+      background: #16a34a;
+      color: #ffffff;
+    }
+    #pasteButton:hover {
+      background: #15803d;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Image Converter</h1>
+    
+    <!-- JPEG Quality Slider -->
+    <div class="slider-container">
+      <label for="qualitySlider">
+        JPEG Quality: <span id="qualityValue">0.9</span>
+      </label>
+      <input
+        type="range"
+        id="qualitySlider"
+        min="0.1"
+        max="1"
+        step="0.1"
+        value="0.9"
+      >
+    </div>
+
+    <!-- Load Image Button -->
+    <div style="margin-bottom: 16px;">
+      <label for="imageInput" class="sr-only">Load Image</label>
+      <input
+        type="file"
+        id="imageInput"
+        accept="image/*"
+        style="display: none;"
+      >
+      <button class="file-button" onclick="document.getElementById('imageInput').click()">
+        Load Image
+      </button>
+    </div>
+
+    <!-- Paste Button -->
+    <button id="pasteButton">Paste Image</button>
+  </div>
+
+  <script>
+    // Update JPEG quality display
+    const qualitySlider = document.getElementById('qualitySlider');
+    const qualityValue = document.getElementById('qualityValue');
+    qualitySlider.addEventListener('input', () => {
+      qualityValue.textContent = qualitySlider.value;
+    });
+
+    // Process image (convert to JPEG and share)
+    async function processImage(blob) {
+      const quality = parseFloat(qualitySlider.value);
+      const img = new Image();
+      img.src = URL.createObjectURL(blob);
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob(async (jpegBlob) => {
+          const file = new File([jpegBlob], 'image.jpg', { type: 'image/jpeg' });
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                files: [file],
+                title: 'Share Image',
+                text: 'Check out this image!',
+              });
+            } catch (err) {
+              console.error('Share failed:', err);
+              alert('Failed to share image.');
+            }
+          } else {
+            alert('Web Share API not supported.');
+          }
+        }, 'image/jpeg', quality);
+        URL.revokeObjectURL(img.src);
+      };
+    }
+
+    // Handle file input
+    document.getElementById('imageInput').addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        processImage(file);
+      } else {
+        alert('Please select an image file.');
+      }
+    });
+
+    // Handle paste button
+    document.getElementById('pasteButton').addEventListener('click', async () => {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+          alert('Clipboard API not supported.');
+          return;
+        }
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          for (const type of item.types) {
+            if (type.startsWith('image/')) {
+              const blob = await item.getType(type);
+              processImage(blob);
+              return;
+            }
+          }
+        }
+        alert('No image found in clipboard.');
+      } catch (err) {
+        console.error('Error accessing clipboard:', err);
+        alert('Failed to access clipboard.');
+      }
+    });
+  </script>
+</body>
+</html>
