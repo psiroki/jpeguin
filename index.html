@@ -189,7 +189,8 @@
     <button id="pasteButton">Paste Image</button>
   </div>
 
-  <script>
+  <script defer="defer" src="crc32.js"></script>
+  <script defer="defer">
     // Load configuration from localStorage
     const defaultConfig = { quality: 0.9, backgroundColor: '#ffffff' };
     let config = JSON.parse(localStorage.getItem('jpeguin')) || defaultConfig;
@@ -214,6 +215,41 @@
       localStorage.setItem('jpeguin', JSON.stringify(config));
     });
 
+    // Detect iOS/iPadOS
+    function isAppleMobileDevice() {
+      const userAgent = navigator.userAgent || navigator.platform || '';
+      const platform = navigator.platform || '';
+      const isIOS = /iPhone|iPad|iPod/.test(userAgent) || 
+                    /iPhone|iPad|iPod/.test(platform) ||
+                    (userAgent.includes('Macintosh') && navigator.maxTouchPoints > 2);
+      return isIOS;
+    }
+
+    function generateFilename(bytes, extension) {
+      const hash = crc32(bytes);
+      return `image_${hash}.${extension}`;
+    }
+
+    async function downloadBlob(jpegBlob) {
+      try {
+        // Read blob as ArrayBuffer and convert to Uint8Array for generateFilename
+        const arrayBuffer = await jpegBlob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+
+        // Create download link
+        const link = document.createElement("a");
+        link.download = generateFilename(bytes, "jpeg");
+        link.href = URL.createObjectURL(jpegBlob);
+        link.click();
+
+        // Clean up the object URL
+        URL.revokeObjectURL(link.href);
+      } catch (error) {
+        console.error("Error downloading blob:", error);
+        throw error;
+      }
+    }
+
     // Process image (convert to JPEG and share)
     async function processImage(blob) {
       const quality = parseFloat(qualitySlider.value);
@@ -229,22 +265,20 @@
         ctx.fillStyle = backgroundColor.value;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(img.src);
         canvas.toBlob(async (jpegBlob) => {
           const file = new File([jpegBlob], 'image.jpg', { type: 'image/jpeg' });
-          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          if (isAppleMobileDevice() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
               await navigator.share({
                 files: [file]
               });
             } catch (err) {
-              console.error('Share failed:', err);
-              alert('Failed to share image.');
+              console.error('Share failed (will fall back to file download):', err);
             }
-          } else {
-            alert('Web Share API not supported.');
           }
+          await downloadBlob(jpegBlob);
         }, 'image/jpeg', quality);
-        URL.revokeObjectURL(img.src);
       };
     }
 
