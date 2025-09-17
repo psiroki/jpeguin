@@ -139,6 +139,25 @@
       clip: rect(0, 0, 0, 0);
       border: 0;
     }
+    .drag-over::before {
+      content: "Drop to convert to JPEG";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, rgba(37, 99, 235, 0.04) 70%);
+      box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 600;
+      color: #1e40af;
+      pointer-events: none;
+      user-select: none;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
@@ -315,6 +334,57 @@
       } catch (err) {
         console.error('Error accessing clipboard:', err);
         alert('Failed to access clipboard.');
+      }
+    });
+
+    // Handle drag and drop events
+    let dragCounter = 0;
+
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1) {
+        document.body.classList.add('drag-over');
+      }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        document.body.classList.remove('drag-over');
+      }
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      document.body.classList.remove('drag-over');
+      
+      const files = Array.from(e.dataTransfer.files);
+      const imageFile = files.find(file => file.type.startsWith('image/'));
+      
+      if (imageFile) {
+        processImage(imageFile);
+      } else {
+        alert('Please drop an image file.');
+      }
+    });
+
+    // Handle global paste events
+    document.addEventListener('paste', async (e) => {
+      const items = Array.from(e.clipboardData.items);
+      const imageItem = items.find(item => item.type.startsWith('image/'));
+      
+      if (imageItem) {
+        e.preventDefault();
+        const blob = imageItem.getAsFile();
+        processImage(blob);
       }
     });
   </script>
