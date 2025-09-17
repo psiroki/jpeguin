@@ -367,12 +367,12 @@
       document.body.classList.remove('drag-over');
       
       const files = Array.from(e.dataTransfer.files);
-      const imageFile = files.find(file => file.type.startsWith('image/'));
+      const imageFiles = files.filter(file => file.type.startsWith('image/'));
       
-      if (imageFile) {
-        processImage(imageFile);
+      if (imageFiles.length > 0) {
+        imageFiles.forEach(imageFile => processImage(imageFile));
       } else {
-        alert('Please drop an image file.');
+        alert('Please drop image files.');
       }
     });
 
