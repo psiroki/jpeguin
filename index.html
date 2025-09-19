@@ -298,7 +298,7 @@
           });
 
           // Read blob as ArrayBuffer and convert to Uint8Array for generateFilename
-          const arrayBuffer = await imageBlob.jpegBlob.arrayBuffer();
+          const arrayBuffer = await jpegBlob.arrayBuffer();
           const bytes = new Uint8Array(arrayBuffer);
           const newName = generateFilename(blob.name, bytes, "jpeg");
           
