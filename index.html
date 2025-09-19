@@ -197,6 +197,7 @@
         type="file"
         id="imageInput"
         accept="image/*"
+        multiple
         style="display: none;"
       >
       <button class="file-button" onclick="document.getElementById('imageInput').click()">
@@ -337,13 +338,13 @@
 
     // Handle file input
     document.getElementById('imageInput').addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file && file.type.startsWith('image/')) {
-        processImage(file);
+      const files = Array.from(event.target.files).filter(file => file.type.startsWith('image/'));
+      if (files.length > 0) {
+        processImages(files);
         // Reset file input to allow re-selecting the same file
         event.target.value = '';
       } else {
-        alert('Please select an image file.');
+        alert('Please select image files.');
       }
     });
 
@@ -355,16 +356,20 @@
           return;
         }
         const clipboardItems = await navigator.clipboard.read();
+        const blobs = [];
         for (const item of clipboardItems) {
           for (const type of item.types) {
             if (type.startsWith('image/')) {
               const blob = await item.getType(type);
-              processImage(blob);
-              return;
+              blobs.push(blob);
             }
           }
         }
-        alert('No image found in clipboard.');
+        if (blobs.length > 0) {
+          processImages(blobs);
+        } else {
+          alert('No images found in clipboard.');
+        }
       } catch (err) {
         console.error('Error accessing clipboard:', err);
         alert('Failed to access clipboard.');
@@ -404,7 +409,7 @@
       const imageFiles = files.filter(file => file.type.startsWith('image/'));
       
       if (imageFiles.length > 0) {
-        imageFiles.forEach(imageFile => processImage(imageFile));
+        processImages(imageFiles);
       } else {
         alert('Please drop image files.');
       }
@@ -413,12 +418,18 @@
     // Handle global paste events
     document.addEventListener('paste', async (e) => {
       const items = Array.from(e.clipboardData.items);
-      const imageItem = items.find(item => item.type.startsWith('image/'));
+      const blobs = [];
       
-      if (imageItem) {
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const blob = item.getAsFile();
+          blobs.push(blob);
+        }
+      }
+      
+      if (blobs.length > 0) {
         e.preventDefault();
-        const blob = imageItem.getAsFile();
-        processImage(blob);
+        processImages(blobs);
       }
     });
   </script>
