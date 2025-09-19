@@ -244,61 +244,95 @@
       return isIOS;
     }
 
-    function generateFilename(bytes, extension) {
+    function generateFilename(originalName, bytes, extension) {
+      let baseName = (originalName || "image").replace(/\.[^\.]+$/, "");
       const hash = crc32(bytes);
-      return `image_${hash}.${extension}`;
+      return `${baseName}_${hash}.${extension}`;
     }
 
-    async function downloadBlob(jpegBlob) {
+    async function downloadBlobs(imageBlobs) {
       try {
-        // Read blob as ArrayBuffer and convert to Uint8Array for generateFilename
-        const arrayBuffer = await jpegBlob.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
+        for (const imageBlob of imageBlobs) {
+          // Create download link
+          const link = document.createElement("a");
+          link.download = imageBlob.name || "image.jpg";
+          link.href = URL.createObjectURL(imageBlob.jpegBlob);
+          link.click();
 
-        // Create download link
-        const link = document.createElement("a");
-        link.download = generateFilename(bytes, "jpeg");
-        link.href = URL.createObjectURL(jpegBlob);
-        link.click();
-
-        // Clean up the object URL
-        URL.revokeObjectURL(link.href);
+          // Clean up the object URL
+          URL.revokeObjectURL(link.href);
+        }
       } catch (error) {
-        console.error("Error downloading blob:", error);
+        console.error("Error downloading blobs:", error);
         throw error;
       }
     }
 
-    // Process image (convert to JPEG and share)
-    async function processImage(blob) {
+    // Process images (convert to JPEG and share)
+    async function processImages(blobs) {
       const quality = parseFloat(qualitySlider.value);
-      const img = new Image();
-      img.src = URL.createObjectURL(blob);
+      const imageBlobs = [];
 
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        // Clear canvas with background color
-        ctx.fillStyle = backgroundColor.value;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(img.src);
-        canvas.toBlob(async (jpegBlob) => {
-          const file = new File([jpegBlob], 'image.jpg', { type: 'image/jpeg' });
-          if (isAppleMobileDevice() && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-              await navigator.share({
-                files: [file]
-              });
-            } catch (err) {
-              console.error('Share failed (will fall back to file download):', err);
-            }
+      // Process one image at a time to avoid memory issues
+      for (const blob of blobs) {
+        try {
+          const imageBitmap = await createImageBitmap(blob);
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = imageBitmap.width;
+          canvas.height = imageBitmap.height;
+          const ctx = canvas.getContext('2d');
+          
+          // Clear canvas with background color
+          ctx.fillStyle = backgroundColor.value;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(imageBitmap, 0, 0);
+          
+          // Close the ImageBitmap to free memory
+          imageBitmap.close();
+          
+          // Convert canvas to JPEG blob
+          const jpegBlob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', quality);
+          });
+
+          // Read blob as ArrayBuffer and convert to Uint8Array for generateFilename
+          const arrayBuffer = await imageBlob.jpegBlob.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const newName = generateFilename(blob.name, bytes, "jpeg");
+          
+          imageBlobs.push({
+            jpegBlob: jpegBlob,
+            name: newName
+          });
+        } catch (error) {
+          console.error('Error processing image:', error);
+        }
+      }
+
+      if (imageBlobs.length === 0) {
+        alert('No images could be processed.');
+        return;
+      }
+
+      // Try to share on Apple mobile devices
+      if (isAppleMobileDevice() && navigator.share && navigator.canShare) {
+        const files = imageBlobs.map(imageBlob => 
+          new File([imageBlob.jpegBlob], imageBlob.name || 'image.jpg', { type: 'image/jpeg' })
+        );
+        
+        if (navigator.canShare({ files })) {
+          try {
+            await navigator.share({ files });
+            return; // Don't download if sharing succeeded
+          } catch (err) {
+            console.error('Share failed (will fall back to file download):', err);
           }
-          await downloadBlob(jpegBlob);
-        }, 'image/jpeg', quality);
-      };
+        }
+      }
+      
+      // Fall back to downloading
+      await downloadBlobs(imageBlobs);
     }
 
     // Handle file input
